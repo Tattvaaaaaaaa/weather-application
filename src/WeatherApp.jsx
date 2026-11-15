@@ -18,35 +18,31 @@ import InfoBox from "./components/InfoBox";
 
 import { getWeatherInfo } from "./services/weatherService";
 
-// Default city shown when the application opens
 const DEFAULT_CITY = "Bhubaneswar";
 
 function WeatherApp() {
 
-  // Central application state
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Function responsible for fetching and updating weather
   const updateInfo = useCallback(async (city, signal) => {
 
     const trimmedCity = city.trim();
 
     if (!trimmedCity) {
+      setError("Please enter a city name.");
       return;
     }
 
     setLoading(true);
     setError("");
-    setWeatherInfo(null);
 
     try {
 
       const data = await getWeatherInfo(trimmedCity, signal);
 
-      // Ignore results from cancelled requests
       if (signal?.aborted) {
         return;
       }
@@ -56,10 +52,12 @@ function WeatherApp() {
 
     } catch (err) {
 
-      // Cancellation is not an application error
-      if (err.name !== "AbortError") {
-        setError(err.message || "Unable to fetch weather.");
+      if (err.name === "AbortError" || signal?.aborted) {
+        return;
       }
+
+      setWeatherInfo(null);
+      setError(err.message || "Unable to retrieve weather information.");
 
     } finally {
 
@@ -71,14 +69,14 @@ function WeatherApp() {
 
   }, []);
 
-  // Load the default city when the component mounts
+  // Load default city when application mounts
+
   useEffect(() => {
 
     const controller = new AbortController();
 
     updateInfo(DEFAULT_CITY, controller.signal);
 
-    // Cancel the request if the component unmounts
     return () => {
       controller.abort();
     };
@@ -88,8 +86,6 @@ function WeatherApp() {
   return (
 
     <Container maxWidth="sm" sx={{ py: 6 }}>
-
-      {/* Application heading */}
 
       <Typography
         variant="h4"
@@ -104,14 +100,14 @@ function WeatherApp() {
         Search for a city to explore its weather.
       </Typography>
 
-      {/* Search component */}
+      {/* Search */}
 
       <SearchBox
         onSearch={updateInfo}
         disabled={loading}
       />
 
-      {/* Loading indicator */}
+      {/* Loading */}
 
       {loading && (
         <Box
@@ -125,23 +121,27 @@ function WeatherApp() {
         </Box>
       )}
 
-      {/* Error message */}
+      {/* API errors */}
 
       {error && (
-        <Alert severity="error" sx={{ mt: 3 }}>
+        <Alert
+          severity="error"
+          variant="filled"
+          sx={{ mt: 3 }}
+        >
           {error}
         </Alert>
       )}
 
-      {/* Weather information */}
+      {/* Weather card */}
 
-      {weatherInfo && (
+      {weatherInfo && !loading && (
         <InfoBox weatherInfo={weatherInfo} />
       )}
 
-      {/* Last updated timestamp */}
+      {/* Last Updated */}
 
-      {lastUpdated && weatherInfo && (
+      {lastUpdated && weatherInfo && !loading && (
         <Typography
           variant="caption"
           color="text.secondary"
@@ -151,7 +151,7 @@ function WeatherApp() {
             mt: 1.5
           }}
         >
-          Last updated: {lastUpdated.toLocaleString()}
+          Last Updated: {lastUpdated.toLocaleString()}
         </Typography>
       )}
 

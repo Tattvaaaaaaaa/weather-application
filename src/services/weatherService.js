@@ -1,21 +1,48 @@
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
 
-// Handle API responses and errors
+// Handle API responses
+
 async function readResponse(response) {
 
-  const data = await response.json();
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("Invalid response received from weather service.");
+  }
 
   if (!response.ok) {
+
+    if (response.status === 401) {
+      throw new Error(
+        "Invalid API key or API key not activated."
+      );
+    }
+
+    if (response.status === 404) {
+      throw new Error(
+        "Weather information not found."
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(
+        "API request limit reached. Please try again later."
+      );
+    }
+
     throw new Error(
-      data.message || "Something went wrong with the API request."
+      data.message || `Weather request failed (${response.status}).`
     );
   }
 
   return data;
 }
 
-// Fetch weather information for a city
+// Main weather function
+
 export async function getWeatherInfo(city, signal) {
 
   if (!API_KEY) {
@@ -28,7 +55,9 @@ export async function getWeatherInfo(city, signal) {
     throw new Error("Please enter a valid city name.");
   }
 
-  // STEP 1: Get geographical coordinates
+  const requestOptions = signal ? { signal } : {};
+
+  // STEP 1: Geocoding API
 
   const geoURL = new URL(
     "https://api.openweathermap.org/geo/1.0/direct"
@@ -38,8 +67,6 @@ export async function getWeatherInfo(city, signal) {
   geoURL.searchParams.set("limit", "1");
   geoURL.searchParams.set("appid", API_KEY);
 
-  const requestOptions = signal ? { signal } : {};
-
   const geoResponse = await fetch(
     geoURL,
     requestOptions
@@ -48,12 +75,14 @@ export async function getWeatherInfo(city, signal) {
   const locations = await readResponse(geoResponse);
 
   if (locations.length === 0) {
-    throw new Error("City not found. Please try another city.");
+    throw new Error(
+      "City not found. Please check the spelling."
+    );
   }
 
   const location = locations[0];
 
-  // STEP 2: Fetch current weather using coordinates
+  // STEP 2: Current Weather API
 
   const weatherURL = new URL(
     "https://api.openweathermap.org/data/2.5/weather"
@@ -71,15 +100,17 @@ export async function getWeatherInfo(city, signal) {
 
   const weatherData = await readResponse(weatherResponse);
 
-  // STEP 3: Extract the required weather information
+  // STEP 3: Extract weather information
 
   const condition = weatherData.weather?.[0];
 
-  if (!condition) {
-    throw new Error("Weather information is unavailable.");
+  if (!condition || !weatherData.main || !weatherData.sys) {
+    throw new Error(
+      "Weather information is incomplete."
+    );
   }
 
-  const result = {
+  return {
 
     city: trimmedCity,
     country: weatherData.sys.country,
@@ -96,9 +127,8 @@ export async function getWeatherInfo(city, signal) {
     main: condition.main,
     icon: condition.icon,
 
-    windSpeed: weatherData.wind.speed
+    windSpeed: weatherData.wind?.speed ?? 0
 
   };
 
-  return result;
 }
