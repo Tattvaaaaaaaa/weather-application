@@ -32,54 +32,29 @@ async function readResponse(response) {
   return data;
 }
 
-// Get current weather
-export async function getWeatherInfo(city, signal) {
-  if (!API_KEY) {
-    throw new Error("OpenWeatherMap API key is missing.");
-  }
 
-  const trimmedCity = city.trim();
-
-  if (!trimmedCity) {
-    throw new Error("Please enter a valid city name.");
-  }
-
-  const requestOptions = signal ? { signal } : {};
-
-  // STEP 1: Geocoding
-  const geoURL = new URL(
-    "https://api.openweathermap.org/geo/1.0/direct"
-  );
-
-  geoURL.searchParams.set("q", trimmedCity);
-  geoURL.searchParams.set("limit", "1");
-  geoURL.searchParams.set("appid", API_KEY);
-
-  const geoResponse = await fetch(geoURL, requestOptions);
-  const locations = await readResponse(geoResponse);
-
-  if (locations.length === 0) {
-    throw new Error("City not found. Check the spelling.");
-  }
-
-  const location = locations[0];
-
-  // STEP 2: Current weather
+// Shared function for fetching current weather using coordinates
+async function fetchWeatherByCoordinates(
+  lat,
+  lon,
+  cityLabel = "",
+  signal
+) {
   const weatherURL = new URL(
     "https://api.openweathermap.org/data/2.5/weather"
   );
 
-  weatherURL.searchParams.set("lat", location.lat);
-  weatherURL.searchParams.set("lon", location.lon);
+  weatherURL.searchParams.set("lat", lat);
+  weatherURL.searchParams.set("lon", lon);
   weatherURL.searchParams.set("units", "metric");
   weatherURL.searchParams.set("appid", API_KEY);
 
-  const weatherResponse = await fetch(
+  const response = await fetch(
     weatherURL,
-    requestOptions
+    signal ? { signal } : {}
   );
 
-  const weatherData = await readResponse(weatherResponse);
+  const weatherData = await readResponse(response);
 
   const condition = weatherData.weather?.[0];
 
@@ -88,14 +63,15 @@ export async function getWeatherInfo(city, signal) {
   }
 
   return {
-    city: trimmedCity,
+    city: cityLabel || weatherData.name || "Your location",
     country: weatherData.sys.country,
 
-    lat: location.lat,
-    lon: location.lon,
+    lat: Number(lat),
+    lon: Number(lon),
 
     temp: weatherData.main.temp,
     feelsLike: weatherData.main.feels_like,
+
     tempMin: weatherData.main.temp_min,
     tempMax: weatherData.main.temp_max,
 
@@ -110,13 +86,71 @@ export async function getWeatherInfo(city, signal) {
 }
 
 
-// Get five-day forecast
+// Get weather using a city name
+export async function getWeatherInfo(city, signal) {
+  if (!API_KEY) {
+    throw new Error("OpenWeatherMap API key is missing.");
+  }
+
+  const trimmedCity = city.trim();
+
+  if (!trimmedCity) {
+    throw new Error("Please enter a valid city name.");
+  }
+
+  // First: Convert city name into coordinates
+  const geoURL = new URL(
+    "https://api.openweathermap.org/geo/1.0/direct"
+  );
+
+  geoURL.searchParams.set("q", trimmedCity);
+  geoURL.searchParams.set("limit", "1");
+  geoURL.searchParams.set("appid", API_KEY);
+
+  const geoResponse = await fetch(
+    geoURL,
+    signal ? { signal } : {}
+  );
+
+  const locations = await readResponse(geoResponse);
+
+  if (locations.length === 0) {
+    throw new Error("City not found. Check the spelling.");
+  }
+
+  const location = locations[0];
+
+  // Second: Fetch weather with the coordinates
+  return fetchWeatherByCoordinates(
+    location.lat,
+    location.lon,
+    trimmedCity,
+    signal
+  );
+}
+
+
+// NEW: Get weather using browser coordinates
+export async function getWeatherByCoordinates(lat, lon, signal) {
+  if (!API_KEY) {
+    throw new Error("OpenWeatherMap API key is missing.");
+  }
+
+  return fetchWeatherByCoordinates(
+    lat,
+    lon,
+    "",
+    signal
+  );
+}
+
+
+// Get five-day weather forecast
 export async function getFiveDayForecast(lat, lon, signal) {
   if (!API_KEY) {
     throw new Error("OpenWeatherMap API key is missing.");
   }
 
-  // STEP 1: Create forecast request
   const forecastURL = new URL(
     "https://api.openweathermap.org/data/2.5/forecast"
   );
@@ -133,7 +167,7 @@ export async function getFiveDayForecast(lat, lon, signal) {
 
   const forecastData = await readResponse(response);
 
-  // STEP 2: Group forecast records by local calendar date
+  // Group forecast records by the city's local date
   const timezoneOffset = forecastData.city?.timezone ?? 0;
   const dailyGroups = new Map();
 
@@ -149,12 +183,11 @@ export async function getFiveDayForecast(lat, lon, signal) {
     dailyGroups.get(localDate).push(item);
   });
 
-  // STEP 3: Convert grouped records into daily summaries
+  // Produce daily summaries
   const dailyForecast = Array.from(dailyGroups.entries())
     .slice(0, 5)
     .map(([date, entries]) => {
 
-      // Select the forecast closest to 12 PM local time
       const representative = entries.reduce((best, item) => {
         const itemHour = new Date(
           (item.dt + timezoneOffset) * 1000
@@ -193,7 +226,6 @@ export async function getFiveDayForecast(lat, lon, signal) {
         dayLabel,
 
         temp: representative.main.temp,
-
         tempMin: Math.min(...temperatures),
         tempMax: Math.max(...temperatures),
 
@@ -202,7 +234,9 @@ export async function getFiveDayForecast(lat, lon, signal) {
         icon: weather?.icon ?? "01d",
 
         pop: Math.round(
-          Math.max(...entries.map((item) => item.pop ?? 0)) * 100
+          Math.max(
+            ...entries.map((item) => item.pop ?? 0)
+          ) * 100
         )
       };
     });

@@ -10,8 +10,11 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Box
+  Box,
+  Button
 } from "@mui/material";
+
+import MyLocationIcon from "@mui/icons-material/MyLocation";
 
 import SearchBox from "./components/SearchBox";
 import InfoBox from "./components/InfoBox";
@@ -19,13 +22,57 @@ import Forecast from "./components/Forecast";
 
 import {
   getWeatherInfo,
+  getWeatherByCoordinates,
   getFiveDayForecast
 } from "./services/weatherService";
 
 const DEFAULT_CITY = "Bhubaneswar";
 
+// Get the user's browser location
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+
+    if (!navigator.geolocation) {
+      reject(
+        new Error("Geolocation is not supported by this browser.")
+      );
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      reject,
+      {
+        enableHighAccuracy: false,
+        timeout: 12000,
+        maximumAge: 300000
+      }
+    );
+
+  });
+}
+
+// Convert browser location errors into readable messages
+function getLocationError(error) {
+
+  if (error.code === 1) {
+    return "Location permission denied. Allow location access in your browser settings.";
+  }
+
+  if (error.code === 2) {
+    return "Your location is currently unavailable.";
+  }
+
+  if (error.code === 3) {
+    return "Location request timed out. Please try again.";
+  }
+
+  return error.message || "Unable to retrieve your location.";
+}
+
 function WeatherApp() {
 
+  // Central application state
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [forecast, setForecast] = useState([]);
 
@@ -35,14 +82,8 @@ function WeatherApp() {
 
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const updateInfo = useCallback(async (city, signal) => {
-
-    const trimmedCity = city.trim();
-
-    if (!trimmedCity) {
-      setError("Please enter a city name.");
-      return;
-    }
+  // Common function for loading weather from any source
+  const loadWeather = useCallback(async (weatherRequest, signal) => {
 
     setLoading(true);
     setError("");
@@ -54,10 +95,7 @@ function WeatherApp() {
     try {
 
       // Fetch current weather
-      const data = await getWeatherInfo(
-        trimmedCity,
-        signal
-      );
+      const data = await weatherRequest(signal);
 
       if (signal?.aborted) {
         return;
@@ -90,9 +128,9 @@ function WeatherApp() {
         }
 
         setForecastError(
-          "Current weather loaded, but forecast is unavailable: " +
-          forecastErr.message
+          "Forecast unavailable: " + forecastErr.message
         );
+
       }
 
       setLastUpdated(new Date());
@@ -110,7 +148,9 @@ function WeatherApp() {
       setForecast([]);
 
       setError(
-        err.message || "Unable to retrieve weather information."
+        err.code
+          ? getLocationError(err)
+          : err.message || "Unable to retrieve weather information."
       );
 
     } finally {
@@ -123,7 +163,49 @@ function WeatherApp() {
 
   }, []);
 
-  // Load the default city when application mounts
+  // Normal city search
+  const updateInfo = useCallback((city, signal) => {
+
+    return loadWeather(
+      (requestSignal) => getWeatherInfo(city, requestSignal),
+      signal
+    );
+
+  }, [loadWeather]);
+
+  // NEW: Search using current browser location
+  const handleUseLocation = useCallback(() => {
+
+    if (!("geolocation" in navigator)) {
+      setError("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    return loadWeather(async (signal) => {
+
+      // Ask browser for permission and coordinates
+      const position = await getCurrentPosition();
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      console.log("Location coordinates received:", {
+        latitude,
+        longitude
+      });
+
+      // Fetch weather using those coordinates
+      return getWeatherByCoordinates(
+        latitude,
+        longitude,
+        signal
+      );
+
+    });
+
+  }, [loadWeather]);
+
+  // Load default city when the application opens
   useEffect(() => {
 
     const controller = new AbortController();
@@ -140,6 +222,8 @@ function WeatherApp() {
 
     <Container maxWidth="md" sx={{ py: 6 }}>
 
+      {/* Application heading */}
+
       <Typography
         variant="h4"
         component="h1"
@@ -153,12 +237,25 @@ function WeatherApp() {
         Search for a city to explore its weather.
       </Typography>
 
-      {/* Search component */}
+      {/* City search */}
 
       <SearchBox
         onSearch={updateInfo}
         disabled={loading}
       />
+
+      {/* Geolocation button */}
+
+      <Button
+        fullWidth
+        variant="outlined"
+        startIcon={<MyLocationIcon />}
+        onClick={handleUseLocation}
+        disabled={loading}
+        sx={{ mt: 2 }}
+      >
+        Use My Location
+      </Button>
 
       {/* Loading indicator */}
 
@@ -174,7 +271,7 @@ function WeatherApp() {
         </Box>
       )}
 
-      {/* Current weather error */}
+      {/* Error alert */}
 
       {error && (
         <Alert
@@ -186,7 +283,7 @@ function WeatherApp() {
         </Alert>
       )}
 
-      {/* Current weather card */}
+      {/* Current weather */}
 
       {weatherInfo && !loading && (
         <InfoBox weatherInfo={weatherInfo} />
@@ -206,7 +303,7 @@ function WeatherApp() {
         <Forecast forecast={forecast} />
       )}
 
-      {/* Last updated */}
+      {/* Timestamp */}
 
       {lastUpdated && weatherInfo && !loading && (
         <Typography
