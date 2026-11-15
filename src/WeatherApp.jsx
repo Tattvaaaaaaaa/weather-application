@@ -19,6 +19,7 @@ import MyLocationIcon from "@mui/icons-material/MyLocation";
 import SearchBox from "./components/SearchBox";
 import InfoBox from "./components/InfoBox";
 import Forecast from "./components/Forecast";
+import SearchHistory from "./components/SearchHistory";
 
 import {
   getWeatherInfo,
@@ -27,9 +28,37 @@ import {
 } from "./services/weatherService";
 
 const DEFAULT_CITY = "Bhubaneswar";
+const HISTORY_KEY = "weather-search-history";
+const MAX_HISTORY = 5;
+
+
+// Read saved history safely
+function getSavedHistory() {
+
+  try {
+
+    const saved = JSON.parse(
+      localStorage.getItem(HISTORY_KEY) || "[]"
+    );
+
+    if (!Array.isArray(saved)) {
+      return [];
+    }
+
+    return saved
+      .filter((city) => typeof city === "string" && city.trim())
+      .slice(0, MAX_HISTORY);
+
+  } catch {
+    return [];
+  }
+
+}
+
 
 // Get the user's browser location
 function getCurrentPosition() {
+
   return new Promise((resolve, reject) => {
 
     if (!navigator.geolocation) {
@@ -50,9 +79,11 @@ function getCurrentPosition() {
     );
 
   });
+
 }
 
-// Convert browser location errors into readable messages
+
+// Convert location errors into readable messages
 function getLocationError(error) {
 
   if (error.code === 1) {
@@ -68,11 +99,13 @@ function getLocationError(error) {
   }
 
   return error.message || "Unable to retrieve your location.";
+
 }
+
 
 function WeatherApp() {
 
-  // Central application state
+  // Central weather state
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [forecast, setForecast] = useState([]);
 
@@ -82,8 +115,65 @@ function WeatherApp() {
 
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Common function for loading weather from any source
-  const loadWeather = useCallback(async (weatherRequest, signal) => {
+  // Load saved search history when component initializes
+  const [searchHistory, setSearchHistory] = useState(
+    getSavedHistory
+  );
+
+
+  // Save history whenever it changes
+  useEffect(() => {
+
+    try {
+
+      localStorage.setItem(
+        HISTORY_KEY,
+        JSON.stringify(searchHistory)
+      );
+
+    } catch (err) {
+
+      console.warn("Unable to save search history:", err);
+
+    }
+
+  }, [searchHistory]);
+
+
+  // Add a successfully searched city to history
+  const addToHistory = (city) => {
+
+    const trimmedCity = city.trim();
+
+    setSearchHistory((previousHistory) => {
+
+      const filteredHistory = previousHistory.filter(
+        (item) =>
+          item.toLowerCase() !== trimmedCity.toLowerCase()
+      );
+
+      return [
+        trimmedCity,
+        ...filteredHistory
+      ].slice(0, MAX_HISTORY);
+
+    });
+
+  };
+
+
+  // Clear all recent searches
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+  };
+
+
+  // Common function for loading weather
+  const loadWeather = useCallback(async (
+    weatherRequest,
+    signal,
+    historyCity = ""
+  ) => {
 
     setLoading(true);
     setError("");
@@ -102,6 +192,11 @@ function WeatherApp() {
       }
 
       setWeatherInfo(data);
+
+      // Save city searches only after successful weather retrieval
+      if (historyCity) {
+        addToHistory(historyCity);
+      }
 
       // Fetch five-day forecast
       try {
@@ -163,38 +258,44 @@ function WeatherApp() {
 
   }, []);
 
+
   // Normal city search
   const updateInfo = useCallback((city, signal) => {
 
+    const trimmedCity = city.trim();
+
     return loadWeather(
-      (requestSignal) => getWeatherInfo(city, requestSignal),
-      signal
+      (requestSignal) =>
+        getWeatherInfo(trimmedCity, requestSignal),
+      signal,
+      trimmedCity
     );
 
   }, [loadWeather]);
 
-  // NEW: Search using current browser location
+
+  // Geolocation feature
   const handleUseLocation = useCallback(() => {
 
     if (!("geolocation" in navigator)) {
+
       setError("Geolocation is not supported by this browser.");
       return;
+
     }
 
     return loadWeather(async (signal) => {
 
-      // Ask browser for permission and coordinates
       const position = await getCurrentPosition();
 
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
 
-      console.log("Location coordinates received:", {
+      console.log("Location received:", {
         latitude,
         longitude
       });
 
-      // Fetch weather using those coordinates
       return getWeatherByCoordinates(
         latitude,
         longitude,
@@ -205,7 +306,8 @@ function WeatherApp() {
 
   }, [loadWeather]);
 
-  // Load default city when the application opens
+
+  // Load default city when application mounts
   useEffect(() => {
 
     const controller = new AbortController();
@@ -217,6 +319,7 @@ function WeatherApp() {
     };
 
   }, [updateInfo]);
+
 
   return (
 
@@ -237,6 +340,7 @@ function WeatherApp() {
         Search for a city to explore its weather.
       </Typography>
 
+
       {/* City search */}
 
       <SearchBox
@@ -244,7 +348,8 @@ function WeatherApp() {
         disabled={loading}
       />
 
-      {/* Geolocation button */}
+
+      {/* Location button */}
 
       <Button
         fullWidth
@@ -256,6 +361,17 @@ function WeatherApp() {
       >
         Use My Location
       </Button>
+
+
+      {/* Search history */}
+
+      <SearchHistory
+        history={searchHistory}
+        onSelect={updateInfo}
+        onClear={clearSearchHistory}
+        disabled={loading}
+      />
+
 
       {/* Loading indicator */}
 
@@ -271,7 +387,8 @@ function WeatherApp() {
         </Box>
       )}
 
-      {/* Error alert */}
+
+      {/* Error notification */}
 
       {error && (
         <Alert
@@ -283,11 +400,13 @@ function WeatherApp() {
         </Alert>
       )}
 
+
       {/* Current weather */}
 
       {weatherInfo && !loading && (
         <InfoBox weatherInfo={weatherInfo} />
       )}
+
 
       {/* Forecast error */}
 
@@ -297,13 +416,15 @@ function WeatherApp() {
         </Alert>
       )}
 
+
       {/* Five-day forecast */}
 
       {weatherInfo && !loading && (
         <Forecast forecast={forecast} />
       )}
 
-      {/* Timestamp */}
+
+      {/* Last updated */}
 
       {lastUpdated && weatherInfo && !loading && (
         <Typography
@@ -322,6 +443,7 @@ function WeatherApp() {
     </Container>
 
   );
+
 }
 
 export default WeatherApp;
