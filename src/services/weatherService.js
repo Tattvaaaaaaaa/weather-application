@@ -58,7 +58,7 @@ export async function getWeatherInfo(city) {
     // STEP 3: Extract and organize useful information
 
     const result = {
-        city: weatherData.name,
+        city: city.trim(),
         country: weatherData.sys.country,
 
         temp: weatherData.main.temp,

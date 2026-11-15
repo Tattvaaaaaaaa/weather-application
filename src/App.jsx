@@ -11,24 +11,22 @@ import {
 } from "@mui/material";
 
 import SearchBox from "./components/SearchBox";
+import InfoBox from "./components/InfoBox";
 import ButtonTest from "./components/ButtonTest";
 
 import { getWeatherInfo } from "./services/weatherService";
 
 function App() {
-
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSearch = async (city) => {
-
     setLoading(true);
     setError("");
     setWeatherInfo(null);
 
     try {
-
       const data = await getWeatherInfo(city);
 
       setWeatherInfo(data);
@@ -36,13 +34,10 @@ function App() {
       console.log("Weather information:", data);
 
     } catch (err) {
-
       setError(err.message);
 
     } finally {
-
       setLoading(false);
-
     }
   };
 
@@ -52,7 +47,13 @@ function App() {
 
       <Container maxWidth="sm" sx={{ py: 6 }}>
 
-        <Typography variant="h4" component="h1" gutterBottom>
+        {/* Application Heading */}
+
+        <Typography
+          variant="h4"
+          component="h1"
+          gutterBottom
+        >
           Weather Application
         </Typography>
 
@@ -60,13 +61,25 @@ function App() {
           Search for a city to explore its weather.
         </Typography>
 
+        {/* City Search Component */}
+
         <SearchBox onSearch={handleSearch} />
 
+        {/* Loading Indicator */}
+
         {loading && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              mt: 3
+            }}
+          >
             <CircularProgress />
           </Box>
         )}
+
+        {/* Error Message */}
 
         {error && (
           <Alert severity="error" sx={{ mt: 3 }}>
@@ -74,45 +87,18 @@ function App() {
           </Alert>
         )}
 
+        {/* Weather Information Card */}
+
         {weatherInfo && (
-          <Box sx={{ mt: 3 }}>
-
-            <Alert severity="success">
-              Weather found for {weatherInfo.city}, {weatherInfo.country}
-            </Alert>
-
-            <Typography sx={{ mt: 2 }}>
-              Temperature: {weatherInfo.temp}°C
-            </Typography>
-
-            <Typography>
-              Feels Like: {weatherInfo.feelsLike}°C
-            </Typography>
-
-            <Typography>
-              Minimum Temperature: {weatherInfo.tempMin}°C
-            </Typography>
-
-            <Typography>
-              Maximum Temperature: {weatherInfo.tempMax}°C
-            </Typography>
-
-            <Typography>
-              Humidity: {weatherInfo.humidity}%
-            </Typography>
-
-            <Typography>
-              Weather: {weatherInfo.description}
-            </Typography>
-
-            <Typography>
-              Wind Speed: {weatherInfo.windSpeed} m/s
-            </Typography>
-
-          </Box>
+          <InfoBox weatherInfo={weatherInfo} />
         )}
 
-        <Typography variant="h6" sx={{ mt: 5 }}>
+        {/* Material UI Button Practice */}
+
+        <Typography
+          variant="h6"
+          sx={{ mt: 5 }}
+        >
           Material UI Button Practice
         </Typography>
 
