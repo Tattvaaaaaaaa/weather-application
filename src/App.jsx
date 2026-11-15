@@ -5,18 +5,45 @@ import {
   CssBaseline,
   Container,
   Typography,
-  Alert
+  Alert,
+  CircularProgress,
+  Box
 } from "@mui/material";
 
 import SearchBox from "./components/SearchBox";
 import ButtonTest from "./components/ButtonTest";
 
-function App() {
-  const [searchedCity, setSearchedCity] = useState("");
+import { getWeatherInfo } from "./services/weatherService";
 
-  const handleSearch = (city) => {
-    setSearchedCity(city);
-    console.log("City entered:", city);
+function App() {
+
+  const [weatherInfo, setWeatherInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSearch = async (city) => {
+
+    setLoading(true);
+    setError("");
+    setWeatherInfo(null);
+
+    try {
+
+      const data = await getWeatherInfo(city);
+
+      setWeatherInfo(data);
+
+      console.log("Weather information:", data);
+
+    } catch (err) {
+
+      setError(err.message);
+
+    } finally {
+
+      setLoading(false);
+
+    }
   };
 
   return (
@@ -25,11 +52,7 @@ function App() {
 
       <Container maxWidth="sm" sx={{ py: 6 }}>
 
-        <Typography
-          variant="h4"
-          component="h1"
-          gutterBottom
-        >
+        <Typography variant="h4" component="h1" gutterBottom>
           Weather Application
         </Typography>
 
@@ -39,13 +62,54 @@ function App() {
 
         <SearchBox onSearch={handleSearch} />
 
-        {searchedCity && (
-          <Alert severity="success" sx={{ mt: 3 }}>
-            Successfully submitted search for{" "}
-            <strong>{searchedCity}</strong>.
+        {loading && (
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <CircularProgress />
+          </Box>
+        )}
 
-            Weather data will be connected in Module 3.
+        {error && (
+          <Alert severity="error" sx={{ mt: 3 }}>
+            {error}
           </Alert>
+        )}
+
+        {weatherInfo && (
+          <Box sx={{ mt: 3 }}>
+
+            <Alert severity="success">
+              Weather found for {weatherInfo.city}, {weatherInfo.country}
+            </Alert>
+
+            <Typography sx={{ mt: 2 }}>
+              Temperature: {weatherInfo.temp}°C
+            </Typography>
+
+            <Typography>
+              Feels Like: {weatherInfo.feelsLike}°C
+            </Typography>
+
+            <Typography>
+              Minimum Temperature: {weatherInfo.tempMin}°C
+            </Typography>
+
+            <Typography>
+              Maximum Temperature: {weatherInfo.tempMax}°C
+            </Typography>
+
+            <Typography>
+              Humidity: {weatherInfo.humidity}%
+            </Typography>
+
+            <Typography>
+              Weather: {weatherInfo.description}
+            </Typography>
+
+            <Typography>
+              Wind Speed: {weatherInfo.windSpeed} m/s
+            </Typography>
+
+          </Box>
         )}
 
         <Typography variant="h6" sx={{ mt: 5 }}>
