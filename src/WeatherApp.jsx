@@ -11,10 +11,14 @@ import {
   Alert,
   CircularProgress,
   Box,
-  Button
+  Button,
+  Paper,
+  Stack,
+  Chip
 } from "@mui/material";
 
 import MyLocationIcon from "@mui/icons-material/MyLocation";
+import CloudQueueIcon from "@mui/icons-material/CloudQueue";
 
 import SearchBox from "./components/SearchBox";
 import InfoBox from "./components/InfoBox";
@@ -34,9 +38,7 @@ const MAX_HISTORY = 5;
 
 // Read saved history safely
 function getSavedHistory() {
-
   try {
-
     const saved = JSON.parse(
       localStorage.getItem(HISTORY_KEY) || "[]"
     );
@@ -46,19 +48,19 @@ function getSavedHistory() {
     }
 
     return saved
-      .filter((city) => typeof city === "string" && city.trim())
+      .filter(
+        (city) => typeof city === "string" && city.trim()
+      )
       .slice(0, MAX_HISTORY);
 
   } catch {
     return [];
   }
-
 }
 
 
-// Get the user's browser location
+// Get the current browser location
 function getCurrentPosition() {
-
   return new Promise((resolve, reject) => {
 
     if (!navigator.geolocation) {
@@ -79,15 +81,13 @@ function getCurrentPosition() {
     );
 
   });
-
 }
 
 
 // Convert location errors into readable messages
 function getLocationError(error) {
-
   if (error.code === 1) {
-    return "Location permission denied. Allow location access in your browser settings.";
+    return "Location permission denied. Allow access in browser settings.";
   }
 
   if (error.code === 2) {
@@ -99,13 +99,11 @@ function getLocationError(error) {
   }
 
   return error.message || "Unable to retrieve your location.";
-
 }
 
 
 function WeatherApp() {
 
-  // Central weather state
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [forecast, setForecast] = useState([]);
 
@@ -115,33 +113,26 @@ function WeatherApp() {
 
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Load saved search history when component initializes
   const [searchHistory, setSearchHistory] = useState(
     getSavedHistory
   );
 
 
-  // Save history whenever it changes
+  // Save history in localStorage
   useEffect(() => {
-
     try {
-
       localStorage.setItem(
         HISTORY_KEY,
         JSON.stringify(searchHistory)
       );
-
     } catch (err) {
-
       console.warn("Unable to save search history:", err);
-
     }
-
   }, [searchHistory]);
 
 
-  // Add a successfully searched city to history
-  const addToHistory = (city) => {
+  // Add successfully searched cities to history
+  const addToHistory = useCallback((city) => {
 
     const trimmedCity = city.trim();
 
@@ -159,16 +150,16 @@ function WeatherApp() {
 
     });
 
-  };
+  }, []);
 
 
-  // Clear all recent searches
+  // Clear history
   const clearSearchHistory = () => {
     setSearchHistory([]);
   };
 
 
-  // Common function for loading weather
+  // Common weather loading function
   const loadWeather = useCallback(async (
     weatherRequest,
     signal,
@@ -184,7 +175,6 @@ function WeatherApp() {
 
     try {
 
-      // Fetch current weather
       const data = await weatherRequest(signal);
 
       if (signal?.aborted) {
@@ -193,12 +183,13 @@ function WeatherApp() {
 
       setWeatherInfo(data);
 
-      // Save city searches only after successful weather retrieval
       if (historyCity) {
         addToHistory(historyCity);
       }
 
-      // Fetch five-day forecast
+      setLastUpdated(new Date());
+
+      // Fetch forecast separately
       try {
 
         const forecastData = await getFiveDayForecast(
@@ -228,8 +219,6 @@ function WeatherApp() {
 
       }
 
-      setLastUpdated(new Date());
-
     } catch (err) {
 
       if (
@@ -256,10 +245,10 @@ function WeatherApp() {
 
     }
 
-  }, []);
+  }, [addToHistory]);
 
 
-  // Normal city search
+  // Search using city name
   const updateInfo = useCallback((city, signal) => {
 
     const trimmedCity = city.trim();
@@ -274,14 +263,12 @@ function WeatherApp() {
   }, [loadWeather]);
 
 
-  // Geolocation feature
+  // Search using current location
   const handleUseLocation = useCallback(() => {
 
     if (!("geolocation" in navigator)) {
-
       setError("Geolocation is not supported by this browser.");
       return;
-
     }
 
     return loadWeather(async (signal) => {
@@ -290,11 +277,6 @@ function WeatherApp() {
 
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
-
-      console.log("Location received:", {
-        latitude,
-        longitude
-      });
 
       return getWeatherByCoordinates(
         latitude,
@@ -307,7 +289,7 @@ function WeatherApp() {
   }, [loadWeather]);
 
 
-  // Load default city when application mounts
+  // Load default city
   useEffect(() => {
 
     const controller = new AbortController();
@@ -323,124 +305,232 @@ function WeatherApp() {
 
   return (
 
-    <Container maxWidth="md" sx={{ py: 6 }}>
+    <Box sx={{ minHeight: "100vh", py: { xs: 3, md: 6 } }}>
 
-      {/* Application heading */}
+      <Container maxWidth="lg">
 
-      <Typography
-        variant="h4"
-        component="h1"
-        fontWeight={600}
-        gutterBottom
-      >
-        Weather Application
-      </Typography>
+        {/* Dashboard heading */}
 
-      <Typography color="text.secondary">
-        Search for a city to explore its weather.
-      </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ mb: 4 }}
+        >
+
+          <Box>
+
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <CloudQueueIcon
+                sx={{ fontSize: 30, color: "#3979d5" }}
+              />
+
+              <Typography
+                variant="overline"
+                color="primary"
+                fontWeight={700}
+                letterSpacing={2}
+              >
+                WEATHER DASHBOARD
+              </Typography>
+            </Stack>
+
+            <Typography
+              variant="h3"
+              component="h1"
+              fontWeight={800}
+              sx={{
+                mt: 1,
+                fontSize: {
+                  xs: "2rem",
+                  md: "2.7rem"
+                }
+              }}
+            >
+              Weather, at a glance.
+            </Typography>
+
+            <Typography
+              color="text.secondary"
+              sx={{ mt: 1 }}
+            >
+              Current conditions and the forecast for your next five days.
+            </Typography>
+
+          </Box>
+
+          <Chip
+            label="Live Weather"
+            color="success"
+            variant="outlined"
+            sx={{
+              fontWeight: 600,
+              px: 1,
+              py: 2
+            }}
+          />
+
+        </Stack>
 
 
-      {/* City search */}
+        {/* Search panel */}
 
-      <SearchBox
-        onSearch={updateInfo}
-        disabled={loading}
-      />
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2, sm: 3 },
+            borderRadius: 4,
+            border: "1px solid #e3eaf4",
+            backgroundColor: "rgba(255,255,255,0.9)",
+            boxShadow: "0 12px 35px rgba(31, 57, 92, 0.05)"
+          }}
+        >
+
+          <Typography variant="h6" fontWeight={700}>
+            Find a location
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            Enter a city or use your current location.
+          </Typography>
+
+          <SearchBox
+            onSearch={updateInfo}
+            disabled={loading}
+          />
+
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<MyLocationIcon />}
+            onClick={handleUseLocation}
+            disabled={loading}
+            sx={{
+              mt: 2,
+              py: 1.2,
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 600
+            }}
+          >
+            Use My Location
+          </Button>
+
+          <SearchHistory
+            history={searchHistory}
+            onSelect={updateInfo}
+            onClear={clearSearchHistory}
+            disabled={loading}
+          />
+
+        </Paper>
 
 
-      {/* Location button */}
+        {/* Loading */}
 
-      <Button
-        fullWidth
-        variant="outlined"
-        startIcon={<MyLocationIcon />}
-        onClick={handleUseLocation}
-        disabled={loading}
-        sx={{ mt: 2 }}
-      >
-        Use My Location
-      </Button>
+        {loading && (
+          <Paper
+            elevation={0}
+            sx={{
+              mt: 3,
+              p: 4,
+              borderRadius: 3,
+              border: "1px solid #e3eaf4",
+              textAlign: "center"
+            }}
+          >
+
+            <CircularProgress />
+
+            <Typography
+              color="text.secondary"
+              variant="body2"
+              sx={{ mt: 2 }}
+            >
+              Fetching weather information...
+            </Typography>
+
+          </Paper>
+        )}
 
 
-      {/* Search history */}
+        {/* Main API error */}
 
-      <SearchHistory
-        history={searchHistory}
-        onSelect={updateInfo}
-        onClear={clearSearchHistory}
-        disabled={loading}
-      />
+        {error && (
+          <Alert
+            severity="error"
+            variant="filled"
+            sx={{ mt: 3, borderRadius: 2 }}
+          >
+            {error}
+          </Alert>
+        )}
 
 
-      {/* Loading indicator */}
+        {/* Current weather and forecast */}
 
-      {loading && (
+        {weatherInfo && !loading && (
+
+          <Box sx={{ mt: 4 }}>
+
+            <InfoBox weatherInfo={weatherInfo} />
+
+            {forecastError && (
+              <Alert
+                severity="warning"
+                sx={{ mt: 2, borderRadius: 2 }}
+              >
+                {forecastError}
+              </Alert>
+            )}
+
+            <Forecast forecast={forecast} />
+
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: "block",
+                textAlign: "right",
+                mt: 2
+              }}
+            >
+              Last updated: {lastUpdated?.toLocaleString()}
+            </Typography>
+
+          </Box>
+
+        )}
+
+
+        {/* Footer */}
+
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "center",
-            mt: 4
+            textAlign: "center",
+            mt: 6,
+            pt: 3,
+            borderTop: "1px solid #dfe6ef"
           }}
         >
-          <CircularProgress />
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+          >
+            Weather information powered by OpenWeatherMap
+          </Typography>
+
         </Box>
-      )}
 
+      </Container>
 
-      {/* Error notification */}
-
-      {error && (
-        <Alert
-          severity="error"
-          variant="filled"
-          sx={{ mt: 3 }}
-        >
-          {error}
-        </Alert>
-      )}
-
-
-      {/* Current weather */}
-
-      {weatherInfo && !loading && (
-        <InfoBox weatherInfo={weatherInfo} />
-      )}
-
-
-      {/* Forecast error */}
-
-      {forecastError && (
-        <Alert severity="warning" sx={{ mt: 2 }}>
-          {forecastError}
-        </Alert>
-      )}
-
-
-      {/* Five-day forecast */}
-
-      {weatherInfo && !loading && (
-        <Forecast forecast={forecast} />
-      )}
-
-
-      {/* Last updated */}
-
-      {lastUpdated && weatherInfo && !loading && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            display: "block",
-            textAlign: "right",
-            mt: 2
-          }}
-        >
-          Last Updated: {lastUpdated.toLocaleString()}
-        </Typography>
-      )}
-
-    </Container>
+    </Box>
 
   );
 

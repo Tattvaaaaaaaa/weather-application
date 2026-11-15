@@ -19,7 +19,6 @@ function SearchBox({ onSearch, disabled = false }) {
     trimmedCity.length < 2;
 
   const handleSubmit = (event) => {
-
     event.preventDefault();
 
     setSubmitted(true);
@@ -29,24 +28,25 @@ function SearchBox({ onSearch, disabled = false }) {
     }
 
     onSearch(trimmedCity);
-
   };
 
   return (
-
     <Stack
       component="form"
       spacing={2}
       onSubmit={handleSubmit}
+      autoComplete="off"
       sx={{ mt: 4 }}
     >
-
       <TextField
+        id="weather-city-search"
+        name="weather-city-search"
         label="City"
         placeholder="e.g. Bhubaneswar"
         variant="outlined"
         fullWidth
         value={city}
+        autoComplete="off"
         disabled={disabled}
 
         onChange={(event) => {
@@ -73,7 +73,6 @@ function SearchBox({ onSearch, disabled = false }) {
       </Button>
 
     </Stack>
-
   );
 }
 

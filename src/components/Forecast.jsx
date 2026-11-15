@@ -3,8 +3,11 @@ import {
   Box,
   Card,
   CardContent,
-  Typography
+  Typography,
+  Stack
 } from "@mui/material";
+
+import WbSunnyOutlinedIcon from "@mui/icons-material/WbSunnyOutlined";
 
 function Forecast({ forecast }) {
 
@@ -13,51 +16,88 @@ function Forecast({ forecast }) {
   }
 
   return (
+
     <Box sx={{ mt: 4 }}>
 
-      <Typography
-        variant="h6"
-        fontWeight={600}
-        gutterBottom
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
       >
-        5-Day Forecast
-      </Typography>
+
+        <Box>
+
+          <Typography
+            variant="h5"
+            fontWeight={750}
+          >
+            5-Day Forecast
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            A look at the weather ahead.
+          </Typography>
+
+        </Box>
+
+        <WbSunnyOutlinedIcon
+          sx={{
+            fontSize: 30,
+            color: "#d99b27"
+          }}
+        />
+
+      </Stack>
+
 
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: {
             xs: "repeat(2, minmax(0, 1fr))",
-            sm: "repeat(5, minmax(0, 1fr))"
+            sm: "repeat(3, minmax(0, 1fr))",
+            md: "repeat(5, minmax(0, 1fr))"
           },
           gap: 1.5
         }}
       >
 
-        {forecast.map((day) => (
+        {forecast.map((day, index) => (
 
           <Card
             key={day.date}
-            variant="outlined"
+            elevation={0}
             sx={{
-              borderRadius: 2,
-              textAlign: "center",
-              minWidth: 0
+              borderRadius: 3,
+              border: "1px solid #e5eaf2",
+              backgroundColor: index === 0 ? "#edf4ff" : "#ffffff",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+
+              "&:hover": {
+                transform: "translateY(-4px)",
+                boxShadow: "0 10px 25px rgba(35,65,105,0.09)"
+              }
             }}
           >
 
             <CardContent
               sx={{
-                p: 1.5,
+                p: 2,
+                textAlign: "center",
                 "&:last-child": {
-                  pb: 1.5
+                  pb: 2
                 }
               }}
             >
 
               <Typography
                 variant="subtitle2"
-                fontWeight={600}
+                fontWeight={700}
               >
                 {day.dayLabel}
               </Typography>
@@ -67,43 +107,64 @@ function Forecast({ forecast }) {
                 src={`https://openweathermap.org/img/wn/${day.icon}@2x.png`}
                 alt={day.description}
                 sx={{
-                  width: 55,
-                  height: 55,
-                  objectFit: "contain"
+                  width: 75,
+                  height: 75,
+                  objectFit: "contain",
+                  display: "block",
+                  mx: "auto",
+                  my: 0.5
                 }}
               />
 
-              <Typography variant="h6" fontWeight={600}>
-                {Math.round(day.temp)}°C
+              <Typography
+                variant="h5"
+                fontWeight={750}
+              >
+                {Math.round(day.temp)}°
               </Typography>
 
               <Typography
                 variant="caption"
                 color="text.secondary"
-                display="block"
               >
-                {Math.round(day.tempMin)}° / {Math.round(day.tempMax)}°
+                {Math.round(day.tempMin)}° / {Math.round(day.tempMax)}°C
               </Typography>
 
               <Typography
-                variant="caption"
-                display="block"
+                variant="body2"
                 sx={{
                   textTransform: "capitalize",
-                  mt: 1
+                  mt: 1,
+                  minHeight: 36
                 }}
               >
                 {day.description}
               </Typography>
 
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-                sx={{ mt: 1 }}
+              <Box
+                sx={{
+                  mt: 1.5,
+                  pt: 1,
+                  borderTop: "1px solid #e9edf3"
+                }}
               >
-                Rain: {day.pop}%
-              </Typography>
+
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Rain probability
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  color="primary"
+                >
+                  {day.pop}%
+                </Typography>
+
+              </Box>
 
             </CardContent>
 
@@ -114,6 +175,7 @@ function Forecast({ forecast }) {
       </Box>
 
     </Box>
+
   );
 }
 
