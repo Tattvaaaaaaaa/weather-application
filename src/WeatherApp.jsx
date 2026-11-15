@@ -15,16 +15,24 @@ import {
 
 import SearchBox from "./components/SearchBox";
 import InfoBox from "./components/InfoBox";
+import Forecast from "./components/Forecast";
 
-import { getWeatherInfo } from "./services/weatherService";
+import {
+  getWeatherInfo,
+  getFiveDayForecast
+} from "./services/weatherService";
 
 const DEFAULT_CITY = "Bhubaneswar";
 
 function WeatherApp() {
 
   const [weatherInfo, setWeatherInfo] = useState(null);
+  const [forecast, setForecast] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [forecastError, setForecastError] = useState("");
+
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const updateInfo = useCallback(async (city, signal) => {
@@ -38,26 +46,72 @@ function WeatherApp() {
 
     setLoading(true);
     setError("");
+    setForecastError("");
+
+    setWeatherInfo(null);
+    setForecast([]);
 
     try {
 
-      const data = await getWeatherInfo(trimmedCity, signal);
+      // Fetch current weather
+      const data = await getWeatherInfo(
+        trimmedCity,
+        signal
+      );
 
       if (signal?.aborted) {
         return;
       }
 
       setWeatherInfo(data);
+
+      // Fetch five-day forecast
+      try {
+
+        const forecastData = await getFiveDayForecast(
+          data.lat,
+          data.lon,
+          signal
+        );
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        setForecast(forecastData);
+
+      } catch (forecastErr) {
+
+        if (
+          forecastErr.name === "AbortError" ||
+          signal?.aborted
+        ) {
+          return;
+        }
+
+        setForecastError(
+          "Current weather loaded, but forecast is unavailable: " +
+          forecastErr.message
+        );
+      }
+
       setLastUpdated(new Date());
 
     } catch (err) {
 
-      if (err.name === "AbortError" || signal?.aborted) {
+      if (
+        err.name === "AbortError" ||
+        signal?.aborted
+      ) {
         return;
       }
 
       setWeatherInfo(null);
-      setError(err.message || "Unable to retrieve weather information.");
+      setForecast([]);
+
+      setError(
+        err.message || "Unable to retrieve weather information."
+      );
 
     } finally {
 
@@ -69,8 +123,7 @@ function WeatherApp() {
 
   }, []);
 
-  // Load default city when application mounts
-
+  // Load the default city when application mounts
   useEffect(() => {
 
     const controller = new AbortController();
@@ -85,7 +138,7 @@ function WeatherApp() {
 
   return (
 
-    <Container maxWidth="sm" sx={{ py: 6 }}>
+    <Container maxWidth="md" sx={{ py: 6 }}>
 
       <Typography
         variant="h4"
@@ -100,14 +153,14 @@ function WeatherApp() {
         Search for a city to explore its weather.
       </Typography>
 
-      {/* Search */}
+      {/* Search component */}
 
       <SearchBox
         onSearch={updateInfo}
         disabled={loading}
       />
 
-      {/* Loading */}
+      {/* Loading indicator */}
 
       {loading && (
         <Box
@@ -121,7 +174,7 @@ function WeatherApp() {
         </Box>
       )}
 
-      {/* API errors */}
+      {/* Current weather error */}
 
       {error && (
         <Alert
@@ -133,13 +186,27 @@ function WeatherApp() {
         </Alert>
       )}
 
-      {/* Weather card */}
+      {/* Current weather card */}
 
       {weatherInfo && !loading && (
         <InfoBox weatherInfo={weatherInfo} />
       )}
 
-      {/* Last Updated */}
+      {/* Forecast error */}
+
+      {forecastError && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          {forecastError}
+        </Alert>
+      )}
+
+      {/* Five-day forecast */}
+
+      {weatherInfo && !loading && (
+        <Forecast forecast={forecast} />
+      )}
+
+      {/* Last updated */}
 
       {lastUpdated && weatherInfo && !loading && (
         <Typography
@@ -148,7 +215,7 @@ function WeatherApp() {
           sx={{
             display: "block",
             textAlign: "right",
-            mt: 1.5
+            mt: 2
           }}
         >
           Last Updated: {lastUpdated.toLocaleString()}
