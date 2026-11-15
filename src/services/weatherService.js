@@ -1,9 +1,11 @@
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
 
+
 // Handle API responses and errors
 async function readResponse(response) {
-  let data = {};
+
+  let data;
 
   try {
     data = await response.json();
@@ -12,6 +14,7 @@ async function readResponse(response) {
   }
 
   if (!response.ok) {
+
     if (response.status === 401) {
       throw new Error("Invalid API key or API key not activated.");
     }
@@ -40,6 +43,7 @@ async function fetchWeatherByCoordinates(
   cityLabel = "",
   signal
 ) {
+
   const weatherURL = new URL(
     "https://api.openweathermap.org/data/2.5/weather"
   );
@@ -63,6 +67,7 @@ async function fetchWeatherByCoordinates(
   }
 
   return {
+
     city: cityLabel || weatherData.name || "Your location",
     country: weatherData.sys.country,
 
@@ -82,12 +87,14 @@ async function fetchWeatherByCoordinates(
     icon: condition.icon,
 
     windSpeed: weatherData.wind?.speed ?? 0
+
   };
 }
 
 
 // Get weather using a city name
 export async function getWeatherInfo(city, signal) {
+
   if (!API_KEY) {
     throw new Error("OpenWeatherMap API key is missing.");
   }
@@ -98,7 +105,7 @@ export async function getWeatherInfo(city, signal) {
     throw new Error("Please enter a valid city name.");
   }
 
-  // First: Convert city name into coordinates
+  // STEP 1: Convert city name into coordinates
   const geoURL = new URL(
     "https://api.openweathermap.org/geo/1.0/direct"
   );
@@ -120,18 +127,20 @@ export async function getWeatherInfo(city, signal) {
 
   const location = locations[0];
 
-  // Second: Fetch weather with the coordinates
+  // STEP 2: Fetch current weather using coordinates
   return fetchWeatherByCoordinates(
     location.lat,
     location.lon,
     trimmedCity,
     signal
   );
+
 }
 
 
-// NEW: Get weather using browser coordinates
+// Get weather using browser coordinates
 export async function getWeatherByCoordinates(lat, lon, signal) {
+
   if (!API_KEY) {
     throw new Error("OpenWeatherMap API key is missing.");
   }
@@ -142,11 +151,13 @@ export async function getWeatherByCoordinates(lat, lon, signal) {
     "",
     signal
   );
+
 }
 
 
 // Get five-day weather forecast
 export async function getFiveDayForecast(lat, lon, signal) {
+
   if (!API_KEY) {
     throw new Error("OpenWeatherMap API key is missing.");
   }
@@ -172,6 +183,7 @@ export async function getFiveDayForecast(lat, lon, signal) {
   const dailyGroups = new Map();
 
   forecastData.list.forEach((item) => {
+
     const localDate = new Date(
       (item.dt + timezoneOffset) * 1000
     ).toISOString().slice(0, 10);
@@ -181,14 +193,18 @@ export async function getFiveDayForecast(lat, lon, signal) {
     }
 
     dailyGroups.get(localDate).push(item);
+
   });
+
 
   // Produce daily summaries
   const dailyForecast = Array.from(dailyGroups.entries())
     .slice(0, 5)
     .map(([date, entries]) => {
 
+      // Select forecast closest to 12 PM local time
       const representative = entries.reduce((best, item) => {
+
         const itemHour = new Date(
           (item.dt + timezoneOffset) * 1000
         ).getUTCHours();
@@ -201,7 +217,9 @@ export async function getFiveDayForecast(lat, lon, signal) {
           Math.abs(bestHour - 12)
           ? item
           : best;
+
       }, entries[0]);
+
 
       const temperatures = entries.map(
         (item) => item.main.temp
@@ -221,11 +239,14 @@ export async function getFiveDayForecast(lat, lon, signal) {
         }
       ).format(dateObject);
 
+
       return {
+
         date,
         dayLabel,
 
         temp: representative.main.temp,
+
         tempMin: Math.min(...temperatures),
         tempMax: Math.max(...temperatures),
 
@@ -238,8 +259,11 @@ export async function getFiveDayForecast(lat, lon, signal) {
             ...entries.map((item) => item.pop ?? 0)
           ) * 100
         )
+
       };
+
     });
 
   return dailyForecast;
+
 }

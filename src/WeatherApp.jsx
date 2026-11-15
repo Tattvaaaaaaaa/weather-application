@@ -104,10 +104,11 @@ function getLocationError(error) {
 
 function WeatherApp() {
 
+  // Central application state
   const [weatherInfo, setWeatherInfo] = useState(null);
   const [forecast, setForecast] = useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [forecastError, setForecastError] = useState("");
 
@@ -153,13 +154,13 @@ function WeatherApp() {
   }, []);
 
 
-  // Clear history
+  // Clear search history
   const clearSearchHistory = () => {
     setSearchHistory([]);
   };
 
 
-  // Common weather loading function
+  // Common function for loading weather
   const loadWeather = useCallback(async (
     weatherRequest,
     signal,
@@ -189,7 +190,7 @@ function WeatherApp() {
 
       setLastUpdated(new Date());
 
-      // Fetch forecast separately
+      // Fetch five-day forecast
       try {
 
         const forecastData = await getFiveDayForecast(
@@ -289,18 +290,94 @@ function WeatherApp() {
   }, [loadWeather]);
 
 
-  // Load default city
+  // Load default city when application mounts
+  // The state updates happen after asynchronous requests,
+  // avoiding synchronous state updates inside the effect.
   useEffect(() => {
 
     const controller = new AbortController();
 
-    updateInfo(DEFAULT_CITY, controller.signal);
+    async function loadDefaultWeather() {
+
+      try {
+
+        // Fetch default city's current weather
+        const data = await getWeatherInfo(
+          DEFAULT_CITY,
+          controller.signal
+        );
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setWeatherInfo(data);
+        addToHistory(DEFAULT_CITY);
+        setLastUpdated(new Date());
+
+        // Fetch its five-day forecast
+        try {
+
+          const forecastData = await getFiveDayForecast(
+            data.lat,
+            data.lon,
+            controller.signal
+          );
+
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setForecast(forecastData);
+
+        } catch (forecastErr) {
+
+          if (
+            forecastErr.name === "AbortError" ||
+            controller.signal.aborted
+          ) {
+            return;
+          }
+
+          setForecastError(
+            "Forecast unavailable: " + forecastErr.message
+          );
+
+        }
+
+      } catch (err) {
+
+        if (
+          err.name === "AbortError" ||
+          controller.signal.aborted
+        ) {
+          return;
+        }
+
+        setWeatherInfo(null);
+        setForecast([]);
+
+        setError(
+          err.message || "Unable to retrieve weather information."
+        );
+
+      } finally {
+
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+
+      }
+
+    }
+
+    loadDefaultWeather();
 
     return () => {
       controller.abort();
     };
 
-  }, [updateInfo]);
+  }, [addToHistory]);
 
 
   return (
@@ -322,6 +399,7 @@ function WeatherApp() {
           <Box>
 
             <Stack direction="row" alignItems="center" spacing={1}>
+
               <CloudQueueIcon
                 sx={{ fontSize: 30, color: "#3979d5" }}
               />
@@ -334,6 +412,7 @@ function WeatherApp() {
               >
                 WEATHER DASHBOARD
               </Typography>
+
             </Stack>
 
             <Typography
@@ -431,7 +510,7 @@ function WeatherApp() {
         </Paper>
 
 
-        {/* Loading */}
+        {/* Loading indicator */}
 
         {loading && (
           <Paper
