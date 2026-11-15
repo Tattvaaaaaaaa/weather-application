@@ -7,7 +7,7 @@ import {
   Stack
 } from "@mui/material";
 
-function SearchBox({ onSearch }) {
+function SearchBox({ onSearch, disabled = false }) {
 
   const [city, setCity] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -19,35 +19,43 @@ function SearchBox({ onSearch }) {
     trimmedCity.length < 2;
 
   const handleSubmit = (event) => {
+
     event.preventDefault();
 
     setSubmitted(true);
 
-    if (trimmedCity.length < 2) {
+    if (disabled || trimmedCity.length < 2) {
       return;
     }
 
     onSearch(trimmedCity);
+
   };
 
   return (
+
     <Stack
       component="form"
       spacing={2}
       onSubmit={handleSubmit}
       sx={{ mt: 4 }}
     >
+
       <TextField
         label="City"
         placeholder="e.g. Bhubaneswar"
         variant="outlined"
         fullWidth
         value={city}
+        disabled={disabled}
+
         onChange={(event) => {
           setCity(event.target.value);
           setSubmitted(false);
         }}
+
         error={hasError}
+
         helperText={
           hasError
             ? "Please enter at least 2 characters."
@@ -59,11 +67,13 @@ function SearchBox({ onSearch }) {
         type="submit"
         variant="contained"
         fullWidth
+        disabled={disabled}
       >
-        Search Weather
+        {disabled ? "Fetching Weather..." : "Search Weather"}
       </Button>
 
     </Stack>
+
   );
 }
 
